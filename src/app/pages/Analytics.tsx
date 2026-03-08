@@ -49,10 +49,11 @@ export function Analytics() {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Weekly Delivery Performance</h2>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={analyticsData.weeklyDeliveries}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="day" stroke="#6b7280" />
-            <YAxis stroke="#6b7280" />
+            <CartesianGrid key="grid-weekly" strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis key="xaxis-weekly" dataKey="day" stroke="#6b7280" />
+            <YAxis key="yaxis-weekly" stroke="#6b7280" />
             <Tooltip 
+              key="tooltip-weekly"
               contentStyle={{ 
                 backgroundColor: 'white', 
                 border: '1px solid #e5e7eb',
@@ -60,8 +61,9 @@ export function Analytics() {
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
               }}
             />
-            <Legend />
+            <Legend key="legend-weekly" />
             <Line 
+              key="line-deliveries"
               type="monotone" 
               dataKey="deliveries" 
               stroke="#3b82f6" 
@@ -69,6 +71,7 @@ export function Analytics() {
               name="Total Deliveries"
             />
             <Line 
+              key="line-delayed"
               type="monotone" 
               dataKey="delayed" 
               stroke="#ef4444" 
@@ -86,10 +89,11 @@ export function Analytics() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Driver Performance (This Week)</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={analyticsData.driverPerformance} layout="horizontal">
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis type="number" stroke="#6b7280" />
-              <YAxis dataKey="name" type="category" width={80} stroke="#6b7280" />
+              <CartesianGrid key="grid-driver" strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis key="xaxis-driver" type="number" stroke="#6b7280" />
+              <YAxis key="yaxis-driver" dataKey="name" type="category" width={80} stroke="#6b7280" />
               <Tooltip 
+                key="tooltip-driver"
                 contentStyle={{ 
                   backgroundColor: 'white', 
                   border: '1px solid #e5e7eb',
@@ -97,7 +101,7 @@ export function Analytics() {
                   boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                 }}
               />
-              <Bar dataKey="completed" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Completed Deliveries" />
+              <Bar key="bar-driver" dataKey="completed" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Completed Deliveries" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -107,10 +111,11 @@ export function Analytics() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Delivery Volume by Time</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={analyticsData.deliveryByHour}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="hour" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
+              <CartesianGrid key="grid-hour" strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis key="xaxis-hour" dataKey="hour" stroke="#6b7280" />
+              <YAxis key="yaxis-hour" stroke="#6b7280" />
               <Tooltip 
+                key="tooltip-hour"
                 contentStyle={{ 
                   backgroundColor: 'white', 
                   border: '1px solid #e5e7eb',
@@ -118,7 +123,7 @@ export function Analytics() {
                   boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                 }}
               />
-              <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name="Deliveries" />
+              <Bar key="bar-hour" dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name="Deliveries" />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Driver, Delivery } from '../lib/mock-data';
 import { MapLegend } from './MapLegend';
 
-// Fix for default marker icons in React-Leaflet
+// Fix for default marker icons in Leaflet
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
@@ -59,136 +58,147 @@ const createDeliveryIcon = (priority: string) => {
   });
 };
 
-// Component to handle map animations
-function AnimatedDrivers({ drivers }: { drivers: Driver[] }) {
-  const map = useMap();
-  const [positions, setPositions] = useState<Record<string, [number, number]>>({});
+export function MapWidget({ drivers, deliveries, height = '600px' }: MapWidgetProps) {
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const markersRef = useRef<{ drivers: L.Marker[]; deliveries: L.Marker[]; routes: L.Polyline[] }>({
+    drivers: [],
+    deliveries: [],
+    routes: [],
+  });
 
+  const center: [number, number] = [40.7489, -73.9680]; // New York City
+
+  // Initialize map
   useEffect(() => {
-    // Initialize positions
-    const initialPositions: Record<string, [number, number]> = {};
-    drivers.forEach(driver => {
-      initialPositions[driver.id] = [driver.lat, driver.lng];
-    });
-    setPositions(initialPositions);
+    if (!mapContainerRef.current || mapRef.current) return;
 
-    // Simulate driver movement
-    const interval = setInterval(() => {
-      setPositions(prev => {
-        const newPositions = { ...prev };
-        drivers.forEach(driver => {
-          if (driver.status === 'delivering') {
-            // Small random movement to simulate driving
-            const currentPos = newPositions[driver.id] || [driver.lat, driver.lng];
-            newPositions[driver.id] = [
-              currentPos[0] + (Math.random() - 0.5) * 0.001,
-              currentPos[1] + (Math.random() - 0.5) * 0.001,
-            ];
+    const map = L.map(mapContainerRef.current).setView(center, 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    mapRef.current = map;
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update markers when data changes
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const map = mapRef.current;
+
+    // Clear existing markers
+    markersRef.current.drivers.forEach(marker => marker.remove());
+    markersRef.current.deliveries.forEach(marker => marker.remove());
+    markersRef.current.routes.forEach(route => route.remove());
+    markersRef.current = { drivers: [], deliveries: [], routes: [] };
+
+    // Add delivery markers
+    deliveries.forEach(delivery => {
+      const marker = L.marker([delivery.lat, delivery.lng], {
+        icon: createDeliveryIcon(delivery.priority),
+      }).addTo(map);
+
+      marker.bindPopup(`
+        <div class="p-2">
+          <p class="font-semibold text-gray-900">${delivery.orderId}</p>
+          <p class="text-xs text-gray-600 mt-1">${delivery.customerAddress}</p>
+          <p class="text-xs text-gray-600">Priority: ${delivery.priority}</p>
+          <p class="text-xs text-gray-600">Status: ${delivery.status}</p>
+        </div>
+      `);
+
+      markersRef.current.deliveries.push(marker);
+    });
+
+    // Add driver markers
+    drivers.forEach(driver => {
+      const marker = L.marker([driver.lat, driver.lng], {
+        icon: createDriverIcon(driver.status),
+      }).addTo(map);
+
+      marker.bindPopup(`
+        <div class="p-2">
+          <p class="font-semibold text-gray-900">${driver.name}</p>
+          <p class="text-xs text-gray-600">ID: ${driver.id}</p>
+          <p class="text-xs text-gray-600 mt-1">Status: ${driver.status}</p>
+          ${driver.currentDelivery ? `<p class="text-xs text-gray-600">Order: ${driver.currentDelivery}</p>` : ''}
+        </div>
+      `);
+
+      markersRef.current.drivers.push(marker);
+    });
+
+    // Add route paths for active deliveries
+    drivers
+      .filter(d => d.status === 'delivering' && d.currentDelivery)
+      .forEach(driver => {
+        const delivery = deliveries.find(del => del.orderId === driver.currentDelivery);
+        if (!delivery) return;
+
+        const route = L.polyline(
+          [
+            [driver.lat, driver.lng],
+            [delivery.lat, delivery.lng],
+          ],
+          {
+            color: '#3b82f6',
+            weight: 3,
+            opacity: 0.7,
+            dashArray: '10, 10',
           }
-        });
-        return newPositions;
+        ).addTo(map);
+
+        markersRef.current.routes.push(route);
+      });
+  }, [drivers, deliveries]);
+
+  // Simulate driver movement animation
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const interval = setInterval(() => {
+      markersRef.current.drivers.forEach((marker, index) => {
+        const driver = drivers[index];
+        if (driver && driver.status === 'delivering') {
+          const currentLatLng = marker.getLatLng();
+          const newLatLng = L.latLng(
+            currentLatLng.lat + (Math.random() - 0.5) * 0.001,
+            currentLatLng.lng + (Math.random() - 0.5) * 0.001
+          );
+          marker.setLatLng(newLatLng);
+
+          // Update route if exists
+          const routeIndex = drivers
+            .slice(0, index)
+            .filter(d => d.status === 'delivering' && d.currentDelivery).length;
+          if (markersRef.current.routes[routeIndex]) {
+            const delivery = deliveries.find(del => del.orderId === driver.currentDelivery);
+            if (delivery) {
+              markersRef.current.routes[routeIndex].setLatLngs([
+                newLatLng,
+                [delivery.lat, delivery.lng],
+              ]);
+            }
+          }
+        }
       });
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [drivers]);
-
-  return (
-    <>
-      {drivers.map(driver => {
-        const position = positions[driver.id] || [driver.lat, driver.lng];
-        return (
-          <Marker
-            key={driver.id}
-            position={position}
-            icon={createDriverIcon(driver.status)}
-          >
-            <Popup>
-              <div className="p-2">
-                <p className="font-semibold text-gray-900">{driver.name}</p>
-                <p className="text-xs text-gray-600">ID: {driver.id}</p>
-                <p className="text-xs text-gray-600 mt-1">Status: {driver.status}</p>
-                {driver.currentDelivery && (
-                  <p className="text-xs text-gray-600">Order: {driver.currentDelivery}</p>
-                )}
-              </div>
-            </Popup>
-          </Marker>
-        );
-      })}
-    </>
-  );
-}
-
-export function MapWidget({ drivers, deliveries, height = '600px' }: MapWidgetProps) {
-  const center: [number, number] = [40.7489, -73.9680]; // New York City
-  
-  // Generate route paths for active deliveries
-  const routes = drivers
-    .filter(d => d.status === 'delivering' && d.currentDelivery)
-    .map(driver => {
-      const delivery = deliveries.find(del => del.orderId === driver.currentDelivery);
-      if (!delivery) return null;
-      
-      return {
-        driverId: driver.id,
-        positions: [
-          [driver.lat, driver.lng] as [number, number],
-          [delivery.lat, delivery.lng] as [number, number],
-        ],
-        color: '#3b82f6',
-      };
-    })
-    .filter(Boolean);
+  }, [drivers, deliveries]);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" style={{ height }}>
-      <MapContainer
-        center={center}
-        zoom={13}
-        style={{ height: '100%', width: '100%' }}
-        scrollWheelZoom={true}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        
-        {/* Route paths */}
-        {routes.map((route, idx) => 
-          route && (
-            <Polyline
-              key={idx}
-              positions={route.positions}
-              color={route.color}
-              weight={3}
-              opacity={0.7}
-              dashArray="10, 10"
-            />
-          )
-        )}
-
-        {/* Delivery markers */}
-        {deliveries.map(delivery => (
-          <Marker
-            key={delivery.id}
-            position={[delivery.lat, delivery.lng]}
-            icon={createDeliveryIcon(delivery.priority)}
-          >
-            <Popup>
-              <div className="p-2">
-                <p className="font-semibold text-gray-900">{delivery.orderId}</p>
-                <p className="text-xs text-gray-600 mt-1">{delivery.customerAddress}</p>
-                <p className="text-xs text-gray-600">Priority: {delivery.priority}</p>
-                <p className="text-xs text-gray-600">Status: {delivery.status}</p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-
-        {/* Animated driver markers */}
-        <AnimatedDrivers drivers={drivers} />
-      </MapContainer>
+      <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} />
       <MapLegend />
     </div>
   );
